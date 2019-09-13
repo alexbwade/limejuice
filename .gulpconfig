@@ -1,0 +1,19 @@
+module.exports = {
+    "css": [],
+    "img": [],
+    "js": [ // lints JS + transpiles ES6 to ES5 + uglifies JS
+        {
+            "src"  : "src/",
+            "dest" : "dist/",
+            "watch": "all"
+        }
+    ],
+
+    "settings": {
+        "minifyCSS"   : true,
+        "sourcemapCSS": true,
+        "minifyJS"    : false,
+        "lintJS"      : true,
+        "smartFind"   : false // if "true", finds "js_dev/" and "sass/" dirs and compiles to adjacent "js/" and "css/" dirs
+    }
+};
