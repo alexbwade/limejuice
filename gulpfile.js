@@ -1,4 +1,4 @@
-/* Version 5.0.0 */
+/* Version 5.1.0 */
 "use strict";
 
 const gulpconfig = require("./.gulpconfig");
@@ -10,7 +10,8 @@ const glob       = require("glob");
 const webpack    = require("webpack"); // JS module bundler
 const wstream    = require("webpack-stream"); // gulp plugin for webpack
 const wconfig    = createWebpackConfig(webpack, gulpconfig);
-const gutil      = require("gulp-util"); // better error msgs
+// const gutil      = require("gulp-util"); // better error msgs
+const fancylog   = require("fancy-log");
 const rename     = require("gulp-rename");
 // const watch      = require("gulp-watch");
 const gsass      = require("gulp-sass");
@@ -24,7 +25,7 @@ const eslint     = require("gulp-eslint");
 const imagemin   = require("gulp-imagemin");
 const imPngquant = require("imagemin-pngquant");
 const imMozjpeg  = require("imagemin-mozjpeg");
-const imGiflossy = require("imagemin-giflossy");
+// const imGiflossy = require("imagemin-giflossy");
 
 
 if (gulpconfig.settings.smartFind === true) {
@@ -111,13 +112,28 @@ gulpconfig.copy && (function addCopySrcGlob (gulpconfig) {
 }(gulpconfig));
 
 
-gulp.task("css", gulpconfig.css && gulpconfig.css.map(conf => "processCSS" + conf.id));
-gulp.task("js", gulpconfig.js && gulpconfig.js.map(conf => "transpileJS:" + conf.id));
-gulp.task("img", gulpconfig.img && gulpconfig.img.map(conf => "compressImages:" + conf.id));
-gulp.task("copy", gulpconfig.copy && gulpconfig.copy.map(conf => "copyFiles" + conf.id));
+// const taskMap = {
+//     "copy": "copyFiles",
+//     "css" : "processCSS",
+//     "js"  : "transpileJS",
+//     "img" : "compressImages"
+// };
+// const configured = Object.keys(gulpconfig).filter(conf => gulpconfig[conf].length > 0); // ignore not configured / empty
 
-gulp.task("all", ["css", "js", "img", "copy"]);
-gulp.task("build", ["css", "js", "img", "copy"]);
+// configured.forEach(confName => { // i.e. "copy"
+//     const taskName = taskMap[confName]; // i.e. "copyFiles"
+//     gulp.task(confName, gulpconfig[confName].map(conf => taskName + conf.id));
+// });
+// gulp.task("all", configured);
+// gulp.task("build", configured);
+
+
+gulp.task("css", gulpconfig.css.map(conf => "processCSS" + conf.id));
+gulp.task("js", gulpconfig.js.map(conf => "transpileJS:" + conf.id));
+gulp.task("img", gulpconfig.img.map(conf => "compressImages:" + conf.id));
+
+gulp.task("all", ["css", "js", "img"]);
+gulp.task("build", ["css", "js", "img"]);
 
 gulp.task("snapshot", () => {
     const display = [];
@@ -130,6 +146,14 @@ gulp.task("snapshot", () => {
 });
 
 gulp.task("default", ["snapshot"], () => {
+
+    if (configExists(gulpconfig, "copy")) {
+        // Sass watches all files intelligently for changes, compiles all
+        gulpconfig.copy.forEach(conf => {
+            gulp.watch(conf.srcGlob, ["copyFiles" + conf.id]);
+                // .on("error", handleErrors);
+        });
+    }
 
     if (configExists(gulpconfig, "css")) {
         // Sass watches all files intelligently for changes, compiles all
@@ -166,14 +190,6 @@ gulp.task("default", ["snapshot"], () => {
             gulp.watch(conf.src + "**/*.{jpg,jpeg,png,gif,svg}", ["compressImages:" + conf.id]);
         });
     }
-
-    if (configExists(gulpconfig, "copy")) {
-        // Sass watches all files intelligently for changes, compiles all
-        gulpconfig.copy.forEach(conf => {
-            gulp.watch(conf.srcGlob, ["copyFiles" + conf.id]);
-                // .on("error", handleErrors);
-        });
-    }
 });
 
 (function generateCopyTasks (gulpconfig) {
@@ -195,13 +211,13 @@ gulp.task("default", ["snapshot"], () => {
         return gulp.src(conf.src + "**/*.scss", {"base": conf.src})
             .pipe(wait(500))
             .pipe(plumber(function (error) {
-                gutil.log(gutil.colors.red(error.message));
+                fancylog.error(error.message);
                 this.emit("end");
             }))
             .pipe(gulpif(maps, sourcemaps.init()))
             .pipe(gsass({
                 "outputStyle": (gulpconfig.settings.minifyCSS ? "compressed" : "expanded")
-            }).on("error", gutil.log))
+            }).on("error", fancylog.error))
             .pipe(gulpif(maps, sourcemaps.write()))
             .pipe(prefix({
                 "browsers": [
@@ -211,7 +227,7 @@ gulp.task("default", ["snapshot"], () => {
             })
             .pipe(rename({
                 "extname": ".min.css"
-            })).on("error", gutil.log))
+            })).on("error", fancylog.error))
             .pipe(gulp.dest(conf.dest));
     }
 }(gulpconfig)); // generateCSStasks
@@ -235,9 +251,9 @@ gulp.task("default", ["snapshot"], () => {
     function lintJS (conf) {
         const src = conf.watch === "all" ? (conf.srcDir + "**/*.js") : conf.src;
         return gulp.src(src)
-            .pipe(eslint().on("error", gutil.log))
-            .pipe(eslint.format().on("error", gutil.log))
-            .pipe(eslint.failAfterError().on("error", gutil.log));
+            .pipe(eslint().on("error", fancylog.error))
+            .pipe(eslint.format().on("error", fancylog.error))
+            .pipe(eslint.failAfterError().on("error", fancylog.error));
     }
     function transpileJS (conf) {
         const minFileName = basename(conf.src) + ".min.js";
@@ -257,13 +273,8 @@ gulp.task("default", ["snapshot"], () => {
         return gulp.src(src, {"base": conf.src})
             .pipe(imagemin([
                 imPngquant({
-                    "speed"  : 1,
-                    "quality": 98 // lossy settings
-                }),
-                imGiflossy({
-                    "optimizationLevel": 3,
-                    "optimize"         : 3, // keep-empty: Preserve empty transparent frames
-                    "lossy"            : 2
+                    "speed"  : 10,
+                    "quality": [0.8, 0.9] // lossy settings
                 }),
                 imagemin.svgo({
                     "plugins": [{
@@ -283,6 +294,15 @@ gulp.task("default", ["snapshot"], () => {
     }
 }(gulpconfig)); // generateIMGtasks
 
+function handleErrors (err) {
+    console.log("Caught error.");
+    if (err.code === "ENOENT") {
+        cleanDirectories();
+        return;
+    } else {
+        console.log("Error code: ", err.code);
+    }
+}
 
 function basename (path) {
     return path.replace(/\\/g,'/').replace(/.*\//, '').replace(/\.[^/.]+$/, "");
@@ -349,18 +369,8 @@ function findDirs (dirToFind, searchDir=__dirname) {
 }
 
 function createWebpackConfig (webpack, gulpconfig) {
-    const plugins = [];
-    if (gulpconfig.settings.minifyJS) {
-        const uglifyJS = new webpack.optimize.UglifyJsPlugin({
-            "mangle": true,
-            "sourcemap": false,
-            "output": {
-                "comments": false
-            }
-        });
-        plugins.push(uglifyJS);
-    }
-    return {
+    const config = {
+        "mode": "development",
         "module": {
             "rules": [
                 {
@@ -369,7 +379,26 @@ function createWebpackConfig (webpack, gulpconfig) {
                     "loader": "babel-loader"
                 }
             ]
-        },
-        "plugins": plugins
+        }
     };
+    if (gulpconfig.settings.minifyJS) {
+        const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+        config["optimization"] = {
+            "minimizer": [
+                new UglifyJsPlugin({
+                    "uglifyOptions": {
+                        "warnings": false,
+                        "mangle": true,
+                        "output": null,
+                        "compress": {
+                            "warnings": false,
+                        }
+                    },
+                    "sourceMap": false,
+                }),
+            ]
+        }
+    }
+
+    return config;
 }
