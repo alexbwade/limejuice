@@ -93,9 +93,11 @@ Form.prototype.assessMode = function () {
 
     if (this.debugMode === "cs_standalone") {
         this.mode.data = null;
-        $("body").children().hide();
-        $(".cs-standalone-show").clone().appendTo("body").show();
-        $(".cs-standalone-hide").hide();
+        if ($(".cs-standalone-show, .cs-standalone-hide").length) {
+            $("body").children().hide();
+            $(".cs-standalone-show").clone().appendTo("body").show();
+            $(".cs-standalone-hide").hide();
+        }
     } else if (this.debugMode === "new_order") {
         this.mode.data = null;
     } else if (this.debugMode === "card_on_file") {

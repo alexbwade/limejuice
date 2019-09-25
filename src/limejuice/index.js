@@ -24,7 +24,7 @@ import "./validate"; // validation config and methods
 
 const LimeJuice = core;
 
-LimeJuice.version = "1.0.0";
+LimeJuice.version = "1.0.2";
 LimeJuice.author  = "Alex Wade";
 
 window.LimeJuice = LimeJuice;
